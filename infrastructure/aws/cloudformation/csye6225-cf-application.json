@@ -1,0 +1,511 @@
+{
+"AWSTemplateFormatVersion" : "2010-09-09",
+   "Parameters" : {
+      "amiId" : {
+         "Description" : "Ami Id to launch ec2 instance",
+         "Type" : "String"
+      },
+      "myVpc"    : {
+       "Description"  : "Id for Vpc",
+       "Type"         : "String"
+      },
+      "subnetId1"    : {
+       "Description"  : "Id for subnet1",
+       "Type"         : "String"
+      },
+      "subnetId2"    : {
+       "Description"  : "Id for subnet2",
+       "Type"         : "String"
+      },
+      "subnetId3"    : {
+       "Description"  : "Id for subnet3",
+       "Type"         : "String"
+      },
+      "bucketName"    : {
+       "Description"  : "name of bucket where app is to be deployed",
+       "Type"         : "String"
+      },
+      "attachmentBucket"    : {
+       "Description"  : "name of bucket where app is to be deployed",
+       "Type"         : "String"
+      },
+      "bucketKey"    : {
+       "Description"  : "key of s3 bucket to fetch zip file",
+       "Type"         : "String"
+      },
+      "domainName"    : {
+       "Description"  : "domain from which we send mail",
+       "Type"         : "String"
+      }
+   },
+   "Conditions": {
+        "Is-EC2-VPC": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AWS::Region"
+                },
+                "us-east-1"
+            ]
+        }
+    },
+   "Resources" : {
+      "myImage" : {
+         "Type" : "AWS::EC2::Instance",
+         "Properties" : {
+            "ImageId" : { "Ref" : "amiId" },
+            "KeyName" : "awsPub",
+            "InstanceType" : "t2.medium",
+            "BlockDeviceMappings" : [
+               {
+                  "DeviceName" : "/dev/sda1",
+                  "Ebs" : {
+                        "VolumeSize" : 20,
+                        "VolumeType" : "gp2",
+                        "DeleteOnTermination": "true"
+                  }
+               }
+            ],
+            "UserData" : {
+               "Fn::Base64" : { 
+                  "Fn::Join" : [
+                     "\n",
+                     [
+                        "#!/bin/bash -xe",
+                        "cd /opt/tomcat/apache-tomcat-9.0.17/bin",
+                        "sudo touch setenv.sh",
+			"sudo chmod 777 /opt/tomcat/apache-tomcat-9.0.17/bin/setenv.sh",
+			"echo 'JAVA_OPTS=\"-Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true\"' >> setenv.sh",
+                        "echo 'JAVA_OPTS=\"$JAVA_OPTS -Dspring.profiles.active=aws\"' >> setenv.sh",
+                        {
+                        "Fn::Join" : [
+                           "",
+                           [
+                           "echo 'JAVA_OPTS=\"-DbucketName=",
+                           {
+                              "Ref" : "attachmentBucket"
+                           },
+                           ".csye6225.com\"' >> setenv.sh"
+                           ]
+                        ]
+                        },
+                        {
+                           "Fn::Join" : [
+                              "",
+                              [
+                                 "echo 'JAVA_OPTS=\"${JAVA_OPTS} -Dspring.datasource.url=\\\"jdbc:mysql://",
+                                 {
+                                    "Fn::GetAtt" : [
+                                       "myRDSInstance",
+				       "Endpoint.Address"	
+                                    ] 
+                                 },
+                                 ":3306/csye6225\\\"\"' >> setenv.sh"
+                              ]
+                           ]
+                        },
+                        "echo 'JAVA_OPTS=\"$JAVA_OPTS -Dspring.datasource.username=csye6225master\"' >> setenv.sh",
+                        "echo 'JAVA_OPTS=\"$JAVA_OPTS -Dspring.datasource.password=csye6225password\"' >> setenv.sh",                        
+                        "sudo chmod 777 /etc/systemd/system/tomcat.service",
+			"echo 'ExecStop=/bin/kill -15 $MAINPID' >> /etc/systemd/system/tomcat.service",
+                        "echo 'Restart=on-failure' >> /etc/systemd/system/tomcat.service",
+                        "echo '[Install]' >> /etc/systemd/system/tomcat.service",
+                        "echo 'WantedBy=multi-user.target' >> /etc/systemd/system/tomcat.service",
+                        "sudo systemctl start mysqld",
+			"sudo systemctl start tomcat.service",
+			"sudo systemctl restart amazon-cloudwatch-agent"
+
+                     ]
+                  ]
+               }
+            },
+            "NetworkInterfaces": [
+                    {
+                        "AssociatePublicIpAddress": "true",
+                        "DeviceIndex": "0",
+                        "GroupSet" : [
+                           {
+                              "Ref" : "webappSecurityGroup"
+                           }
+                        ],
+                        "SubnetId": {
+                            "Ref": "subnetId1"
+                        }
+                    }
+                ],
+            "IamInstanceProfile" : {
+               "Ref" : "InstanceProfile"
+            }, 
+            "Tags" : [
+               {
+                  "Key" : "Name",
+                  "Value": {
+                     "Fn::Join": [
+                     "",
+                     [
+                        {
+                           "Ref": "AWS::StackName"
+                        },
+                        "-csye6225-Ec2Instance"
+                     ]
+                     ]
+                  }
+               }
+            ]
+         }
+      },
+      "codeDeployRole" : {
+         "Type" : "AWS::IAM::Role",
+         "Properties" : {
+            "AssumeRolePolicyDocument": {
+               "Version" : "2012-10-17",
+               "Statement" : [
+                  {
+                     "Effect" : "Allow",
+                     "Principal" : {
+                     "Service" : ["ec2.amazonaws.com"]
+                  },
+                     "Action" : [
+                     "sts:AssumeRole"
+                     ]
+                  }
+               ]
+            },
+            "RoleName" : "CodeDeployEc2ServiceRole",
+	    "ManagedPolicyArns": [
+          	"arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy",
+	        "arn:aws:iam::aws:policy/AmazonSNSFullAccess" 
+             ],
+            "Path" : "/"
+         }
+      },
+      "InstanceProfile" : {
+         "Type" : "AWS::IAM::InstanceProfile",
+         "Properties" : {
+            "Path" : "/",
+            "Roles" : [
+               {
+                  "Ref" : "codeDeployRole"
+               }
+            ]
+         }
+      },
+      "codeDeployEc2S3" : {
+         "Type" : "AWS::IAM::ManagedPolicy",
+         "Properties" : {
+            "PolicyDocument" : {
+               "Version": "2012-10-17",
+               "Statement": [
+                  {
+                     "Effect": "Allow",
+                     "Action": [
+                        "s3:*"
+                     ],
+                     "Resource":[{
+                     "Fn::Join": [
+                        "",
+                        [
+                           "arn:aws:s3:::",
+                           {
+                              "Ref": "bucketName"
+                           },
+                           "/*"
+                        ]
+                      ]
+                     }]
+                     },
+                  {
+                     "Effect": "Allow",
+                     "Action": [
+                        "s3:*"
+                     ],
+                     "Resource":[{
+                     "Fn::Join": [
+                        "",
+                        [
+                           "arn:aws:s3:::",
+                           {
+                              "Ref": "attachmentBucket"
+                           },
+                           ".csye6225.com/*"
+                        ]
+                      ]
+                     }]
+                  } 
+               ]
+            },
+            "Roles" : [ { "Ref" : "codeDeployRole" } ],
+            "ManagedPolicyName" : "CodeDeploy-Ec2-S3" 
+         }
+      },
+      "CodeDeployServiceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "CodeDeployServiceRole",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codedeploy.amazonaws.com"
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+        ],
+        "Path": "/"
+      }
+    },
+    "codeDeployApp" : {
+      "Type" : "AWS::CodeDeploy::Application",
+      "Properties" : {
+        "ApplicationName" : "csye6225-webapp",
+        "ComputePlatform" : "Server"
+      }
+    },
+    "deploymentGroup": {
+      "Type": "AWS::CodeDeploy::DeploymentGroup",
+      "Properties": {
+        "ApplicationName": { "Ref" : "codeDeployApp"},
+        "Ec2TagFilters": [
+          {
+            "Key" : "Name",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "-csye6225-Ec2Instance"
+                ]
+              ]
+            }, 
+            "Type": "KEY_AND_VALUE"
+          }
+        ],
+        "DeploymentGroupName": "csye6225-webapp-deployment",
+        "DeploymentConfigName": "CodeDeployDefault.AllAtOnce",
+        "DeploymentStyle": {
+          "DeploymentType": "IN_PLACE",
+          "DeploymentOption": "WITHOUT_TRAFFIC_CONTROL"
+        },
+        "ServiceRoleArn": {
+          "Fn::GetAtt": [
+            "CodeDeployServiceRole",
+            "Arn"
+          ]
+        },
+        "AutoRollbackConfiguration": {
+          "Enabled" : "True",
+          "Events" : ["DEPLOYMENT_FAILURE"]
+        }
+      }
+    },
+      "myDynamoDB" : {
+         "Type" : "AWS::DynamoDB::Table",
+         "Properties" : {
+            "TableName" : "csye6225",
+            "AttributeDefinitions" : [
+		  {
+			"AttributeName" : "id",
+			"AttributeType" : "S"   
+		  }
+		],
+		"KeySchema" : [
+		  {
+			"AttributeName" : "id",
+			"KeyType" : "HASH"
+		  }
+		],
+	    "ProvisionedThroughput" : {
+	      "ReadCapacityUnits" : "5",
+	      "WriteCapacityUnits" : "5"
+		    },
+  	    "TimeToLiveSpecification": {
+                  "AttributeName": "passwordTokenExpiry",
+                  "Enabled": "true"
+                  }
+		}
+      },
+      "RDSDBSubnetGroup":{  
+         "Type"       :"AWS::RDS::DBSubnetGroup",
+         "Properties" :{  
+            "DBSubnetGroupDescription":"RDS DB Subnet Group",
+            "SubnetIds" : [ 
+               { "Ref" : "subnetId2" },
+               { "Ref" : "subnetId3" }
+            ]
+         }
+      },
+      "myRDSInstance" : {
+         "Type" : "AWS::RDS::DBInstance",
+         "Properties" : {
+            "AllocatedStorage" : "5",
+            "DBInstanceClass" : "db.t2.medium",
+            "DBInstanceIdentifier" : "csye6225-spring2019",
+            "DBSubnetGroupName" : { "Ref"  : "RDSDBSubnetGroup" },
+            "MasterUsername" : "csye6225master",
+            "MasterUserPassword" : "csye6225password",
+            "MultiAZ" : false,
+            "PubliclyAccessible" : true,
+            "Engine" : "MySQL",
+            "VPCSecurityGroups": [{
+               "Ref" : "DBSecurityGroup"
+            }],
+            "DBName" : "csye6225"
+         }     
+      },
+      "webappSecurityGroup" : {
+         "Type" : "AWS::EC2::SecurityGroup",
+         "Properties" : {
+            "GroupDescription" : "Allow http traffic to webserver",
+            "VpcId": {
+                    "Ref": "myVpc"
+                }, 
+            "SecurityGroupIngress" : [
+               {
+                  "IpProtocol": "tcp",
+                  "FromPort" : "22",
+                  "ToPort" : "22",
+                  "CidrIp" : "0.0.0.0/0"
+               },
+               {
+                  "IpProtocol": "tcp",
+                  "FromPort" : "80",
+                  "ToPort" : "80",
+                  "CidrIp" : "0.0.0.0/0"
+               },
+               {
+                  "IpProtocol": "tcp",
+                  "FromPort" : "443",
+                  "ToPort" : "443",
+                  "CidrIp" : "0.0.0.0/0"
+               },
+               {
+                  "IpProtocol": "tcp",
+                  "FromPort" : "8080",
+                  "ToPort" : "8080",
+                  "CidrIp" : "0.0.0.0/0"
+               }
+            ]
+         }
+      },
+       "DBSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Condition": "Is-EC2-VPC",
+            "Properties": {
+                "GroupDescription": "allow connections from specified source security group and ec2 Security group",
+                "VpcId": {
+                    "Ref": "myVpc"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "3306",
+                        "ToPort": "3306",
+                        "SourceSecurityGroupId": {
+                            "Ref": "webappSecurityGroup"
+                        }
+                    }
+                ]
+            }
+      },
+      "SNSTopic": {
+      "Type" : "AWS::SNS::Topic",
+      "Properties" : {
+         "DisplayName" : "MySNSTopic",
+         "TopicName" : "password_reset",
+         "Subscription": [
+	         {
+				  "Endpoint": {
+				    "Fn::GetAtt": [ "LambdaFunction", "Arn" ]
+				  },
+				  "Protocol": "lambda"
+				}
+			      ]
+		}
+      },
+      "LambdaExecutionRole" : {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "LambdaExecutionRole",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "ManagedPolicyArns": [
+	        "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole", 
+			  "arn:aws:iam::aws:policy/AmazonSESFullAccess", 
+			  "arn:aws:iam::aws:policy/AmazonSNSFullAccess", 
+			  "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+			  "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+        ]
+      }
+      },
+      "LambdaResourcePolicy": {
+        "Type": "AWS::Lambda::Permission",
+        "Properties": {
+          "FunctionName" : { "Ref" : "LambdaFunction" },
+          "Principal": "sns.amazonaws.com",
+          "Action": "lambda:InvokeFunction",
+          "SourceArn" : {
+             "Fn::Join" : [
+                ":",
+                [
+                  "arn:aws:sns:us-east-1",
+                    {
+                       "Ref": "AWS::AccountId"
+                    },
+                       "password_reset"
+                    ]
+                ]
+          }
+        }
+      },
+      "LambdaFunction": {
+        "Type": "AWS::Lambda::Function",
+        "Properties": {
+         "Handler": "LogEvent::handleRequest",
+         "Role": { "Fn::GetAtt" : ["LambdaExecutionRole", "Arn"] },
+         "Code": {
+           "S3Bucket": { "Ref" : "bucketName" },
+           "S3Key": { "Ref" : "bucketKey" }         
+         },
+         "Runtime": "java8",
+         "Environment" : { 
+            "Variables" : {
+               "Domain" : { "Ref" : "domainName" }
+            }
+         },
+         "FunctionName" : "csye6225_spring2019",
+         "MemorySize" : 256,
+         "Timeout": 180
+         
+        }
+      }
+   },
+   "Outputs" : {
+      "Dynamodb" : {
+         "Description" : "Dynamodb to be attached with lambda function",
+         "Value" :  { "Ref" : "myDynamoDB" },
+         "Export" : { "Name" : "csye6225-dynamodb" }
+      }
+   }
+}

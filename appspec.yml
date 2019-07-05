@@ -1,0 +1,15 @@
+version: 0.0
+os: linux
+
+files:
+  - source: webapp/build/libs/webapp-0.0.1-SNAPSHOT.war
+    destination: /opt/tomcat/apache-tomcat-9.0.17/webapps
+  - source: cloudwatch-config.json
+    destination: /opt/tomcat/apache-tomcat-9.0.17/
+
+
+hooks:
+  AfterInstall:
+    - location: ./afterInstall.sh
+      timeout: 180
+      runas: centos

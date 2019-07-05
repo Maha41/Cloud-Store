@@ -1,0 +1,471 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "AWS WAF Basic OWASP Example Rule Set",
+	"Parameters": {
+
+
+		"MyLoadBalancer":{
+			"Type": "String",
+			"Description": "Load getting balanced"
+		}
+
+	},
+	
+	"Resources": {
+		"sqlinjectionSet": {
+        "Type": "AWS::WAFRegional::SqlInjectionMatchSet",
+        
+        "Properties": {
+          "Name": "RegionalSqlInjectionMatchSet",
+          "SqlInjectionMatchTuples": [
+            {
+              "FieldToMatch": {
+                "Type": "URI"
+              },
+              "TextTransformation": "URL_DECODE"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "URI"
+              },
+              "TextTransformation": "HTML_ENTITY_DECODE"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "QUERY_STRING"
+              },
+              "TextTransformation": "URL_DECODE"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "QUERY_STRING"
+              },
+              "TextTransformation": "HTML_ENTITY_DECODE"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "BODY"
+              },
+              "TextTransformation": "URL_DECODE"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "BODY"
+              },
+              "TextTransformation": "HTML_ENTITY_DECODE"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "HEADER",
+                "Data": "cookie"
+              },
+              "TextTransformation": "URL_DECODE"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "HEADER",
+                "Data": "cookie"
+              },
+              "TextTransformation": "HTML_ENTITY_DECODE"
+            }
+          ]
+        }
+      },
+
+      "sqlinjectionRule": {
+      "Type": "AWS::WAFRegional::Rule",
+
+      "Properties": {
+      "MetricName": "sqlinjectionRule",
+      "Name": "sqlinjectionRule",
+      "Predicates": [
+        {
+          "Type": "SqlInjectionMatch",
+          "Negated": false,
+          "DataId": {"Ref":"sqlinjectionSet"}
+        }
+      ]
+      }
+      },
+
+      "SizeRestrictionSet": {
+        "Type": "AWS::WAFRegional::SizeConstraintSet",
+        
+        "Properties": {
+          "Name": "RegionslSizeConstraintMatchSet",
+          "SizeConstraints": [
+            {
+              "FieldToMatch": {
+                "Type": "URI"
+              },
+              "TextTransformation": "NONE",
+              "ComparisonOperator": "GT",
+              "Size": "512"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "QUERY_STRING"
+              },
+              "TextTransformation": "NONE",
+              "ComparisonOperator": "GT",
+              "Size": "1024"
+            },
+            {
+              "FieldToMatch": {
+                "Type": "BODY"
+              },
+              "TextTransformation": "NONE",
+              "ComparisonOperator": "GT",
+              "Size":"10000000"
+            },
+            {
+              "FieldToMatch": {
+                "Type" : "HEADER",
+                "Data": "cookie"
+              },
+              "TextTransformation": "NONE",
+              "ComparisonOperator": "GT",
+              "Size":"4096"
+
+            }
+          ]
+        }
+      },
+
+      "SizeRestrictionRule": {
+      "Type": "AWS::WAFRegional::Rule",
+
+      "Properties": {
+      "MetricName": "SizeRestrictionRule",
+      "Name": "SizeRestrictionRule",
+      "Predicates": [
+        {
+          "Type": "SizeConstraint",
+          "Negated": false,
+          "DataId": {"Ref":"SizeRestrictionSet"}
+        }
+      ]
+      }
+      },
+
+      "AuthTokenStringSet": {
+        "Type": "AWS::WAFRegional::ByteMatchSet",
+        "Properties": {
+          "Name": "Regional Byte MatchSet",
+          "ByteMatchTuples": [
+            {
+              "FieldToMatch": {
+                "Type": "HEADER",
+                "Data": "cookie"
+              },
+              "PositionalConstraint": "CONTAINS",
+              "TargetString": "csye6225-spring2019",
+              "TextTransformation": "NONE"
+            }
+          ]
+        }
+      },
+      "AuthTokenRule": {
+        "Type": "AWS::WAFRegional::Rule",
+        
+        "Properties": {
+          "MetricName": "AuthTokenRule",
+          "Name": "AuthTokenRule",
+          "Predicates": [
+            {
+              "Type": "ByteMatch",
+              "Negated": false,
+              "DataId": {"Ref":"AuthTokenStringSet"}
+            }
+          ]
+        }
+          },
+
+        "XSSSet": {
+          "Type": "AWS::WAFRegional::XssMatchSet",
+          
+          "Properties": {
+            "Name": "Regional Xss MatchSet",
+            "XssMatchTuples": [
+              {
+                "FieldToMatch": {
+                  "Type": "URI"
+                },
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "URI"
+                },
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "QUERY_STRING"
+                },
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "QUERY_STRING"
+                },
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "BODY"
+                },
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "BODY"
+                },
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "HEADER",
+                  "Data": "cookie"
+                },
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "HEADER",
+                  "Data": "cookie"
+                },
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              }
+            ]
+          }
+        },
+        "XSSRule": {
+          "Type": "AWS::WAFRegional::Rule",
+          
+          "Properties": {
+            "MetricName": "XSSRule",
+            "Name": "XSSRule",
+            "Predicates": [
+              {
+                "Type": "XssMatch",
+                "Negated": false,
+                "DataId": {"Ref":"XSSSet"}
+              }
+            ]
+          }
+            },
+
+        "PathsStringSet": {
+          "Type": "AWS::WAFRegional::ByteMatchSet",
+          
+          "Properties": {
+            "Name": "RegionalPathsStringSet",
+            "ByteMatchTuples": [
+              {
+                "FieldToMatch": {
+                  "Type": "URI"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "../",
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "URI"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "../",
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "QUERY_STRING"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "../",
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "QUERY_STRING"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "../",
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "URI"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "://",
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "URI"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "://",
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "QUERY_STRING"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "://",
+                "TextTransformation": "URL_DECODE"
+              },
+              {
+                "FieldToMatch": {
+                  "Type": "QUERY_STRING"
+                },
+                "PositionalConstraint": "CONTAINS",
+                "TargetString": "://",
+                "TextTransformation": "HTML_ENTITY_DECODE"
+              }
+            ]
+          }
+        },
+        "PathsRule": {
+          "Type": "AWS::WAFRegional::Rule",
+          
+          "Properties": {
+            "MetricName": "PathsRuleMetric",
+            "Name": "PathsRuleName",
+            "Predicates": [
+              {
+                "Type": "ByteMatch",
+                "Negated": false,
+                "DataId": {"Ref":"PathsStringSet"}
+              }
+            ]
+          }
+            },
+
+          "IpBlacklistSet": {
+            "Type": "AWS::WAFRegional::IPSet",
+            
+            "Properties": {
+              "Name": "IPSet for blacklisted IP addresses avoiding security vulnerabilities",
+              "IPSetDescriptors": [
+                {
+                  "Type": "IPV4",
+                  "Value": "10.0.0.0/8"
+                },
+                {
+                  "Type": "IPV4",
+                  "Value": "192.168.0.0/16"
+                },
+                {
+                  "Type": "IPV4",
+                  "Value": "169.254.0.0/16"
+                },
+                {
+                  "Type": "IPV4",
+                  "Value": "172.16.0.0/16"
+                },
+                {
+                  "Type": "IPV4",
+                  "Value": "127.0.0.1/32"
+                }
+              ]
+            }
+          },
+          "IpBlacklistRule": {
+            "Type": "AWS::WAFRegional::Rule",
+            
+            "Properties": {
+              "MetricName": "IpBlacklistRule",
+              "Name": "IpBlacklistRule",
+              "Predicates": [
+                {
+                  "Type": "IPMatch",
+                  "Negated": false,
+                  "DataId": {"Ref":"IpBlacklistSet"}
+                }
+              ]
+            }
+          },
+	"MyWebACLAssociation": {
+        
+		"Type": "AWS::WAFRegional::WebACLAssociation",
+		"DependsOn":["myLoadBalancer","shuntiWebACL"],
+		"Properties": {
+		    "ResourceArn": { "Ref": "myLoadBalancer" },
+		    "WebACLId": { "Ref": "shuntiWebACL" }
+		}
+    	},
+        "WebACL": {
+          "Type": "AWS::WAFRegional::WebACL",
+          
+          "Properties": {
+            
+            "Name": "My Web ACL",
+            "DefaultAction": {
+              "Type": "ALLOW"
+            },
+            "MetricName": "WebACL",
+            "Rules": [
+
+                        {
+                "Action": {
+                  "Type": "BLOCK"
+                },
+                "Priority": 1,
+                "RuleId": {"Ref":"sqlinjectionRule"}
+                        },
+                        
+                        {
+                "Action": {
+                  "Type": "BLOCK"
+                },
+                "Priority": 2,
+                "RuleId": {"Ref":"AuthTokenRule"}
+                        },
+                        
+                        {
+                "Action": {
+                  "Type": "BLOCK"
+                },
+                "Priority": 3,
+                "RuleId": {"Ref":"XSSRule"}
+              },
+              {
+                "Action": {
+                  "Type": "BLOCK"
+                },
+                "Priority": 4,
+                "RuleId": {"Ref":"PathsRule"}
+              },	
+              {
+                "Action": {
+                  "Type": "BLOCK"
+                },
+                "Priority": 5,
+                "RuleId": {"Ref":"IpBlacklistRule"}
+              },
+              {
+                "Action": {
+                  "Type": "BLOCK"
+                },
+                "Priority": 6,
+                "RuleId": {"Ref":"SizeRestrictionRule"}
+              }
+
+            ]
+          }
+        },
+	"MyWebACLAssociation": {
+        
+		"Type": "AWS::WAFRegional::WebACLAssociation",
+		"DependsOn":["myLoadBalancer","WebACL"],
+		"Properties": {
+		    "ResourceArn": { "Ref": "myLoadBalancer" },
+		    "WebACLId": { "Ref": "WebACL" }
+		}
+    	}	
+	}
+}

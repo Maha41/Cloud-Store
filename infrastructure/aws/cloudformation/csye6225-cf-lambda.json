@@ -1,0 +1,86 @@
+{
+   "AWSTemplateFormatVersion" : "2010-09-09",
+   "Resources" : {
+      "SNSTopic": {
+      "Type" : "AWS::SNS::Topic",
+      "Properties" : {
+         "DisplayName" : "MySNSTopic",
+         "TopicName" : "csye6225_spring2019",
+         "Subscription": [
+	         {
+				  "Endpoint": {
+				    "Fn::GetAtt": [ "LambdaFunction", "Arn" ]
+				  },
+				  "Protocol": "lambda"
+				}
+			      ]
+		}
+      },
+
+      "LambdaExecutionRole" : {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "LambdaExecutionRole",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "ManagedPolicyArns": [
+	        "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole", 
+			  "arn:aws:iam::aws:policy/AmazonSESFullAccess", 
+			  "arn:aws:iam::aws:policy/AmazonSNSFullAccess", 
+			  "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",	
+          		  "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+        ]
+      }
+      },
+      "LambdaResourcePolicy": {
+        "Type": "AWS::Lambda::Permission",
+        "Properties": {
+          "FunctionName" : { "Ref" : "LambdaFunction" },
+          "Principal": "sns.amazonaws.com",
+          "Action": "lambda:InvokeFunction",
+          "SourceArn" : {
+             "Fn::Join" : [
+                ":",
+                [
+                  "arn:aws:sns:us-east-1",
+                    {
+                       "Ref": "AWS::AccountId"
+                    },
+                       "csye6225_spring2019"
+                    ]
+                ]
+          }
+        }
+      },
+      "LambdaFunction": {
+        "Type": "AWS::Lambda::Function",
+        "Properties": {
+         "Handler": "LogEvent::handleRequest",
+         "Role": { "Fn::GetAtt" : ["LambdaExecutionRole", "Arn"] },
+         "Code": {
+           "S3Bucket": "code-deploy.csye6225-spring2019-kuvalekars.me",
+           "S3Key": "lamda-1.0-SNAPSHOT.zip"         
+         },
+         "Runtime": "java8",
+         "FunctionName" : "csye6225_spring2019",
+         "MemorySize" : 256,
+
+         "Timeout": 180
+         
+        }
+      }
+   }
+}

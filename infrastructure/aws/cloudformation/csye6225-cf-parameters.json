@@ -1,0 +1,69 @@
+[
+   {
+      "ParameterKey": "cidrVpc",
+      "ParameterValue": "192.168.0.0/16"
+   },
+   {
+      "ParameterKey": "cidrSubnet1",
+      "ParameterValue": "192.168.1.0/24"
+   },
+   {
+      "ParameterKey": "cidrSubnet2",
+      "ParameterValue": "192.168.2.0/24"
+   },
+   {
+      "ParameterKey": "cidrSubnet3",
+      "ParameterValue": "192.168.3.0/24"
+   },
+   {
+      "ParameterKey": "cidrSubnet4",
+      "ParameterValue": "192.168.4.0/24"
+   },
+   {
+      "ParameterKey": "cidrSubnet5",
+      "ParameterValue": "192.168.5.0/24"
+   },
+   {
+      "ParameterKey": "destBlock",
+      "ParameterValue": "0.0.0.0/0"
+   }
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
